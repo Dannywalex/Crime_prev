@@ -10,6 +10,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Load the trained model and vectorizer
 nltk.download('punkt')
+nltk.download('stopwords')
 rf_model = joblib.load("random_forest_model.joblib")
 vectorizer = joblib.load("tfidf_vectorizer.joblib")
 

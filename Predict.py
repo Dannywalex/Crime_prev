@@ -2,12 +2,11 @@ import streamlit as st
 import pandas as pd
 import joblib
 import string
-import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-nltk.download('punkt')
+
 # Load the trained model and vectorizer
 rf_model = joblib.load("random_forest_model.joblib")
 vectorizer = joblib.load("tfidf_vectorizer.joblib")

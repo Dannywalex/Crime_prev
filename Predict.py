@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np  
 import joblib
 import string
 import nltk
@@ -8,45 +9,43 @@ from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-# Load the trained model and vectorizer
+# Download NLTK once
 nltk.download('punkt')
 nltk.download('stopwords')
-rf_model = joblib.load("random_forest_model.joblib")
-vectorizer = joblib.load("tfidf_vectorizer.joblib")
 
-# Function to preprocess text
+# Load the saved hashing objects + RF
+hash_vectorizer   = joblib.load("hash_vectorizer.joblib")
+tfidf_transformer = joblib.load("tfidf_transformer.joblib")
+rf_hashing        = joblib.load("rf_hashing_model.joblib")
+
 def preprocess_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     tokens = word_tokenize(text.lower())
-    tokens = [word for word in tokens if word not in stopwords.words('english')]
-    return ' '.join(tokens)
+    tokens = [t for t in tokens if t not in stopwords.words('english')]
+    return " ".join(tokens)
 
-
-# Streamlit app title
 st.title("Crime Occurrence Prediction from Tweets")
 
-# Text input for user to enter tweet
-tweet_input = st.text_area("Enter the tweet text here:")
+tweet_input = st.text_area("Enter tweet text:")
 
-# Button to make prediction
 if st.button("Predict"):
-    if tweet_input:
-        # Preprocess the input text
-        processed_text = preprocess_text(tweet_input)
-        # Vectorize the input text
-        input_tfidf = vectorizer.transform([processed_text])
-        # Make prediction
-        prediction = rf_model.predict(input_tfidf)
-        prediction_proba = rf_model.predict_proba(input_tfidf)
+    if tweet_input.strip():
+        processed = preprocess_text(tweet_input)
 
-        # Display the prediction result
-        if prediction[0] == 1:
-            st.success("This tweet is likely related to a crime occurrence.")
-        else:
-            st.success("This tweet is likely not related to a crime occurrence.")
+        # 1) Hash → 2) TF-IDF transform
+        X_h = hash_vectorizer.transform([processed])
+        X_tfidf = tfidf_transformer.transform(X_h)
 
-        # Display prediction probabilities
-        st.write(f"Prediction Probability: {prediction_proba[0]}")
-            
+        # Because hashing + tfidf never yields a truly “zero” vector (unless the input was empty),
+        # there’s no need to check for nnz == 0. Every token (even a new one) falls into some hash bucket.
+        pred_label = rf_hashing.predict(X_tfidf)[0]
+        proba      = rf_hashing.predict_proba(X_tfidf)[0]
+        classes    = rf_hashing.classes_
+
+        st.markdown(f"**Predicted Category:** `{pred_label}`")
+        # show top-2 probabilities
+        top2 = np.argsort(proba)[-2:][::-1]
+        for idx in top2:
+            st.write(f"{classes[idx]}: {proba[idx]:.3f}")
     else:
-        st.warning("Please enter a tweet to make a prediction.")
+        st.warning("Please enter some tweet text.")

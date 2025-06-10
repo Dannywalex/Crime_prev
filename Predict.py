@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 import string
 import nltk
+import matplotlib.pyplot as plt
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -13,10 +14,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 nltk.download('punkt')
 nltk.download('stopwords')
 
-# Load the saved hashing objects + RF
-hash_vectorizer   = joblib.load("hash_vectorizer.joblib")
-tfidf_transformer = joblib.load("tfidf_transformer.joblib")
-rf_hashing        = joblib.load("rf_hashing_model.joblib")
+# Load the entire trained pipeline (includes hashing, tfidf, and RF)
+pipeline = joblib.load("rf_hashing_pipeline.joblib")
 
 def preprocess_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
@@ -24,7 +23,7 @@ def preprocess_text(text):
     tokens = [t for t in tokens if t not in stopwords.words('english')]
     return " ".join(tokens)
 
-st.title("Crime Occurrence Prediction from Tweets")
+st.title("Crime Tweet Classifier")
 
 tweet_input = st.text_area("Enter tweet text:")
 
@@ -32,18 +31,27 @@ if st.button("Predict"):
     if tweet_input.strip():
         processed = preprocess_text(tweet_input)
 
-        # 1) Hash → 2) TF-IDF transform
-        X_h = hash_vectorizer.transform([processed])
-        X_tfidf = tfidf_transformer.transform(X_h)
+        # Predict using the full pipeline
+        pred_label = pipeline.predict([processed])[0]
+        proba = pipeline.predict_proba([processed])[0]
+        classes = pipeline.classes_
 
-        # Because hashing + tfidf never yields a truly “zero” vector (unless the input was empty),
-        # there’s no need to check for nnz == 0. Every token (even a new one) falls into some hash bucket.
-        pred_label = rf_hashing.predict(X_tfidf)[0]
-        proba      = rf_hashing.predict_proba(X_tfidf)[0]
-        classes    = rf_hashing.classes_
+        
+
+        # ... after predicting
+        st.subheader("Full Class Probabilities:")
+        fig, ax = plt.subplots()
+        ax.barh(classes, proba, color='skyblue')
+        ax.set_xlim(0, 1)
+        ax.set_xlabel("Probability")
+        ax.set_title("Predicted Probabilities by Class")
+        st.pyplot(fig)
+
 
         st.markdown(f"**Predicted Category:** `{pred_label}`")
-        # show top-2 probabilities
+
+        # Show top 2 class probabilities
+        st.subheader("Top-2 Class Probabilities:")
         top2 = np.argsort(proba)[-2:][::-1]
         for idx in top2:
             st.write(f"{classes[idx]}: {proba[idx]:.3f}")
